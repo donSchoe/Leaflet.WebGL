@@ -1,11 +1,11 @@
-### Leaflet.WebGL
+# Leaflet.WebGL
 
 Leaflet plugin architecture for WebGL integration.
 
 This plugin is optimized for rendering geodata vertices or native geometries on leaflet maps using WebGL. It's not designed to draw raster tiles or images (yet). That said, it should not be impossible though.
 
 
-##### Usage & Demo
+### Usage & Demo
 
 **Usage**:
 
@@ -66,7 +66,7 @@ $ git checkout -b gh-pages
 ```
 
 
-##### Requires
+### Requires
 
 - Leaflet
   - https://github.com/leaflet/leaflet
@@ -78,13 +78,13 @@ $ git checkout -b gh-pages
   - https://code.google.com/p/webglsamples/source/browse/book/webgl-utils.js
 
 
-##### Optional
+### Optional
 
 - Leaflet Tile Buffers (for geometry tiles)
   - https://github.com/donSchoe/L.TileBuffer
 
 
-##### Copyright
+### Copyright
 
 (C) 2015 Alexander Schoedon <schoedon@uni-potsdam.de>
 

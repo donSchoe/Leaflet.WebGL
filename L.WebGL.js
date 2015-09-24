@@ -22,28 +22,34 @@
 */
 
 /**
- * Leaflet webgl class
+ * Leaflet webgl class, wrapper and webgl extension for leaflet and canvas overlay.
  */
 L.WebGL = L.Class.extend({
 
+  /* static members */
   EARTH_EQUATOR : 40075016.68557849,
   EARTH_RADIUS : 6378137.0,
   TILE_SIZE : 256.0,
+
+  /* private members */
   _sp : null,
   _gl : null,
   _overlay : null,
   _canvas : null,
   _map : null,
   _drawFunct : null,
+
+  /* public options */
   options : {},
 
-
+  /* initialize, tell webgl about draw callback */
   initialize : function(drawFunct, options) {
     this._drawFunct = drawFunct;
     this._overlay = L.canvasOverlay().drawing(this._drawFunct);
     L.setOptions(this, options);
   },
 
+  /* update, tell webgl about draw callback */
   params : function(drawFunct, options) {
     this._drawFunct = drawFunct;
     this._overlay = L.canvasOverlay().drawing(this._drawFunct);
@@ -51,12 +57,14 @@ L.WebGL = L.Class.extend({
     return this;
   },
 
+  /* tell webgl about draw callback */
   drawing : function (drawFunct) {
     this._drawFunct = drawFunct;
     this._overlay = L.canvasOverlay().drawing(this._drawFunct);
     return this;
   },
 
+  /* add to map, create canvas overlay, tell about canvas dimensions */
   addTo : function(map) {
     this._map = map;
     this._overlay = L.canvasOverlay().drawing(this._drawFunct).addTo(this._map);
@@ -67,6 +75,7 @@ L.WebGL = L.Class.extend({
     return this;
   },
 
+  /* create webgl context using webgl debug utils */
   _initGL : function() {
     this._gl = WebGLDebugUtils.makeDebugContext(
       WebGLUtils.setupWebGL(this._canvas),
@@ -76,6 +85,7 @@ L.WebGL = L.Class.extend({
     return this._gl;
   },
 
+  /* create, compile and link vertex and fragment shader */
   initShaders : function(vertex, fragment) {
     var vShader = this._compileShader("x-shader/x-vertex", vertex);
     var fShader = this._compileShader("x-shader/x-fragment", fragment);
@@ -92,6 +102,7 @@ L.WebGL = L.Class.extend({
     }
   },
 
+  /* compile shaders */
   _compileShader : function(type, source) {
     var shader;
     if (type == "x-shader/x-fragment") {
@@ -112,22 +123,27 @@ L.WebGL = L.Class.extend({
     return shader;
   },
 
+  /* throw gl errors */
   _throwOnGLError : function (e, f, args) {
     throw WebGLDebugUtils.glEnumToString(e) + " was caused by call to " + f;
   },
 
+  /* return webgl context */
   context : function() {
     return this._gl;
   },
 
+  /* return leaflet canvas */
   canvas : function() {
     return this._canvas;
   },
 
+  /* set model view matrix location from shader */
   setModelViewLocation : function(uniformLoc) {
     this._sp.uniformMatrix = this._gl.getUniformLocation(this._sp, uniformLoc);
   },
 
+  /* update model view, should be called on each redraw */
   updateModelView : function() {
     this._gl.enable(this._gl.BLEND);
     this._gl.blendFunc(this._gl.SRC_ALPHA, this._gl.ONE_MINUS_SRC_ALPHA);
@@ -147,6 +163,7 @@ L.WebGL = L.Class.extend({
     this._gl.uniformMatrix4fv(this._sp.uniformMatrix, false, uMatrix);
   },
 
+  /* helper: create identity matrix */
   identityMatrix : function() {
     return new Float32Array([
       1,0,0,0,
@@ -156,6 +173,7 @@ L.WebGL = L.Class.extend({
     ]);
   },
 
+  /* helper: translate matrix */
   translateMatrix : function(m, x, y) {
     m[12] += m[0] * x + m[4] * y;
     m[13] += m[1] * x + m[5] * y;
@@ -163,6 +181,7 @@ L.WebGL = L.Class.extend({
     m[15] += m[3] * x + m[7] * y;
   },
 
+  /* helper: scale matrix */
   scaleMatrix : function(m, x, y) {
     m[0] *= x;
     m[1] *= x;
@@ -174,12 +193,14 @@ L.WebGL = L.Class.extend({
     m[7] *= y;
   },
 
+  /* helper: convert epsg:3857 web mercator coordinates to tile pixel coordinates */
   mercatorToPixels : function(p)  {
     var pixelX = (p.x + (this.EARTH_EQUATOR / 2.0)) / (this.EARTH_EQUATOR / this.TILE_SIZE);
     var pixelY = ((p.y - (this.EARTH_EQUATOR / 2.0)) / (this.EARTH_EQUATOR / -this.TILE_SIZE));
     return L.point(pixelX, pixelY);
   },
 
+  /* helper: convert epsg:4326 wgs84 coordinates to tile pixel coordinates */
   latLonToPixels : function(p) {
     var sinLat = Math.sin(p.lat * Math.PI / 180.0);
     var pixelX = ((p.lng + 180) / 360) * this.TILE_SIZE;
@@ -187,11 +208,13 @@ L.WebGL = L.Class.extend({
     return L.point(pixelX, pixelY);
   },
 
+  /* override to string */
   toString : function() {
-    return "Leaflet WebGL object";
+    return "Leaflet WebGL context overlay";
   },
 });
 
+/* wrapper to create a webGL overlay */
 L.webGL = function (drawFunct, options) {
   return new L.WebGL(drawFunct, options);
 };
