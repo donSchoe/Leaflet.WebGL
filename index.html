@@ -1,0 +1,285 @@
+<!DOCTYPE html>
+
+<!--
+  Demo implementation of leaflet webgl plugin architecture .
+
+  ** Copyright & License **
+  (C) 2015 Alexander Schoedon <schoedon@uni-potsdam.de>
+
+  All rights reserved.
+-->
+
+<html>
+  <head>
+    <title>Leaflet WebGL Demo</title>
+    <meta charset="utf-8">
+
+    <!-- styles -->
+    <link rel="stylesheet" href="./lib/leaflet/leaflet.css" />
+
+    <style>
+      html { height: 100% }
+      body { height: 100%; margin: 0; padding: 0 }
+      #map { height: 100% }
+    </style>
+
+    <!-- libs -->
+    <script src="./lib/google/webgl-utils.js"></script>
+    <script src="./lib/khronos/webgl-debug.js"></script>
+    <script src="./lib/leaflet/leaflet.js"></script>
+    <script src="./lib/leaflet-canvasoverlay/L.CanvasOverlay.js"></script>
+    <script src="./lib/leaflet-tilebuffer/L.TileBuffer.js"></script>
+    <script src="./lib/leaflet-tilebuffer/L.TileBufferCollection.js"></script>
+    <script src="./lib/leaflet-webgl/L.WebGL.js"></script>
+
+    <!-- shaders -->
+    <script type="x-shader/x-vertex" id="shader-vtx">
+      uniform mat4 u_matrix;
+
+      attribute vec3 a_vertex;
+      attribute vec4 a_color;
+
+      varying vec4 v_color;
+
+      void main(void) {
+        gl_Position = u_matrix * vec4(a_vertex, 1.0);
+        v_color = a_color;
+      }
+    </script>
+    <script type="x-shader/x-fragment" id="shader-frg">
+      precision mediump float;
+
+      varying vec4 v_color;
+
+      void main(void) {
+        gl_FragColor = v_color;
+      }
+    </script>
+  </head>
+  <body onload="demo()">
+
+    <!-- canvas -->
+    <div id="map"></div>
+
+    <!-- leaflet-webgl -->
+    <script type="text/javascript">
+
+      /* global leaflet map and canvas */
+      var M, C;
+
+      /* global webgl context and shader program */
+      var GL, SP;
+
+      /* global center berlin, default zoom, preload an example tile */
+      var CENTER_BERLIN = [52.516, 13.377];
+      var DEFAULT_ZOOM = 14;
+
+      /* cache for all tile's vertex, index and color buffers */
+      var TILE_CACHE;
+      var MAX_VERTICES = Math.pow(2, 4); // vertices per random tile, @TODO remove
+
+      /**
+       * initialize the leaflet webgl demo
+       */
+      function demo() {
+
+        /* leaflet map canvas */
+        M = L.map('map', {
+          minZoom: 6,
+          maxZoom: 18,
+          maxBounds: L.latLngBounds(L.latLng(49.6, 6.0), L.latLng(54.8, 20.4)),
+          noWrap: true,
+          continuousWorld: false
+        }).setView(CENTER_BERLIN, DEFAULT_ZOOM);
+
+        /* leaflet webgl overlay with custom drawing function */
+        /* drawGL() will now be called on any map redraw event  */
+        L.WebGL = L.webGL(drawGL).addTo(M);
+
+        /* retrieve canvas and gl context from leaflet webgl plugin */
+        C = L.WebGL.canvas();
+        GL = L.WebGL.context();
+
+        /* tell the program about your shaders */
+        vtxShader = document.getElementById("shader-vtx").firstChild.textContent;
+        frgShader = document.getElementById("shader-frg").firstChild.textContent;
+        SP = L.WebGL.initShaders(vtxShader, frgShader);
+
+        /* set model view location */
+        L.WebGL.setModelViewLocation("u_matrix");
+
+        /* set shader attribute locations */
+        SP.vertexPosition = GL.getAttribLocation(SP, "a_vertex");
+        SP.vertexColor = GL.getAttribLocation(SP, "a_color");
+        GL.enableVertexAttribArray(SP.vertexPosition);
+        GL.enableVertexAttribArray(SP.vertexColor);
+
+        /* setup map with mapbox basemap tiles */
+        var tileLayerUrl =
+          'https://api.tiles.mapbox.com/v4/{id}/{z}/{x}/{y}.png?access_token={accessToken}';
+        var attribution =
+          '<a href="https://www.mapbox.com/developers/vector-tiles/">Mapbox</a> | '
+          + 'Rendering &copy; <a href="./LICENSE">Schoedon</a>';
+        var token =
+          'pk.eyJ1IjoiZG9uc2Nob2UiLCJhIjoiMkN5RUk0QSJ9.FGcEYWjfgcJUmSyN1tkwgQ';
+        var mapboxTiles = L.tileLayer(tileLayerUrl, {
+          attribution: attribution,
+          id: 'mapbox.dark',
+          accessToken: token,
+          noWrap: true,
+          continuousWorld: false
+        });
+
+        /* init cache for tile buffers for current zoom level */
+        TILE_CACHE = L.tileBufferCollection(M.getZoom());
+
+        /* reset tile buffer cache for each zoom level change */
+        M.on('zoomstart', function(e) {
+          TILE_CACHE.resetOnZoom(M.getZoom());
+        });
+
+        /* create webgl geometry tiles */
+        var hardwareTiles = L.tileLayer.canvas({async:false});
+        hardwareTiles.drawTile = function(canvas, tile, zoom) {
+
+          /* currently: random geometries */
+          createRandomTileBuffer(tile, zoom);
+        }
+
+        /* redraw the scene after all tiles are loaded */
+        hardwareTiles.on('load', function(e) {
+          drawGL();
+        });
+
+        /* add mapbox and webgl tiles to the map */
+        mapboxTiles.addTo(M);
+        hardwareTiles.addTo(M);
+
+        /* adjust misc map settings */
+        M.zoomControl.setPosition('bottomright');
+      }
+
+      /**
+       * draw anything you want here. don't forget to always update the modelview.
+       */
+      function drawGL() {
+
+        /* only draw if context is available */
+        if(GL) {
+
+          /* update model view of the webgl overlay */
+          L.WebGL.updateModelView();
+
+          /* define sizes of vertex and color buffer objects */
+          var vtxSize = 2;
+          var clrSize = 4;
+
+          /* adjust line width based on zoom */
+          var width = Math.max(M.getZoom() - 12.0, 1.0);
+          GL.lineWidth(width);
+
+          /* loop all tile buffers in cache and draw each geometry */
+          var tileBuffers = TILE_CACHE.getTileBufferCollection();
+          for (var i = TILE_CACHE.getSize() - 1; i >= 0; i--) {
+
+            /* create vertex buffer */
+            var vtxBuffer = GL.createBuffer();
+            GL.bindBuffer(GL.ARRAY_BUFFER, vtxBuffer);
+            GL.bufferData(GL.ARRAY_BUFFER, tileBuffers[i].getVertexBuffer(), GL.STATIC_DRAW);
+            GL.vertexAttribPointer(SP.vertexPosition, vtxSize, GL.FLOAT, false, 0, 0);
+
+            /* create color buffer */
+            var clrBuffer = GL.createBuffer();
+            GL.bindBuffer(GL.ARRAY_BUFFER, clrBuffer);
+            GL.bufferData(GL.ARRAY_BUFFER, tileBuffers[i].getColorBuffer(), GL.STATIC_DRAW);
+            GL.vertexAttribPointer(SP.vertexColor, clrSize, GL.FLOAT, false, 0, 0);
+
+            /* create index buffer */
+            var idxBuffer = GL.createBuffer();
+            GL.bindBuffer(GL.ELEMENT_ARRAY_BUFFER, idxBuffer);
+            GL.bufferData(GL.ELEMENT_ARRAY_BUFFER, tileBuffers[i].getIndexBuffer(), GL.STATIC_DRAW);
+
+            /* draw geometry lines by indices */
+            GL.drawElements(GL.LINES, tileBuffers[i].getIndexBuffer().length, GL.UNSIGNED_SHORT, idxBuffer);
+          }
+        }
+      }
+
+      /**
+       * create a random tile buffer within tile bounds and add it to the cache
+       *
+       * @param {object} tile the tile to fill
+       * @param {integer} zoom the current zoom level
+       */
+      function createRandomTileBuffer(tile, zoom) {
+
+        /* calculate tile size, corners and bounds */
+        var size = L.WebGL.EARTH_EQUATOR / Math.pow(2, zoom);
+        var west = (size * tile.x) - (L.WebGL.EARTH_EQUATOR / 2.0);
+        var north = - (size * tile.y) + (L.WebGL.EARTH_EQUATOR / 2.0);
+        var east = west + size;
+        var south = north - size;
+
+        var nw = new L.Point(west, north);
+        nw = L.Projection.SphericalMercator.unproject(nw.divideBy(L.WebGL.EARTH_RADIUS));
+        var topLeft = L.WebGL.latLonToPixels(nw);
+
+        var se = new L.Point(east, south);
+        se = L.Projection.SphericalMercator.unproject(se.divideBy(L.WebGL.EARTH_RADIUS));
+        var bottomRight = L.WebGL.latLonToPixels(se);
+
+        /* define sizes of vertex and color buffer objects */
+        var vtxSize = 2;
+        var clrSize = 4;
+
+        /* use white and red to visualize vertices */
+        var clrPicker = [
+          254.0 / 255.0, 239.0 / 255.0, 167.0 / 255.0,  /* #feefa7 */
+          244.0 / 255.0, 109.0 / 255.0,  67.0 / 255.0,  /* #f46d43 */
+        ];
+
+        /* generate random vertex, index and color buffers */
+        var vtx = new Float32Array(vtxSize * MAX_VERTICES);
+        var idx = new Uint16Array((MAX_VERTICES - 1) * 2);
+        var clr = new Float32Array(clrSize * MAX_VERTICES);
+
+        /* vertex buffer: random points within the tile bounds */
+        for (var i = 0; i < MAX_VERTICES; i++) {
+          vtx[i * vtxSize] = Math.random() * (bottomRight.x - topLeft.x) + topLeft.x;
+          vtx[i * vtxSize + 1] = Math.random() * (bottomRight.y - topLeft.y) + topLeft.y;
+          idx[i] = i;
+          clr[i * clrSize] = clrPicker[i * 3 % 6];
+          clr[i * clrSize + 1] = clrPicker[i * 3 % 6 + 1];
+          clr[i * clrSize + 2] = clrPicker[i * 3 % 6 + 2];
+          clr[i * clrSize + 3] = 1.0;
+        };
+
+        /* index buffer: draw continuous lines */
+        var k = 0, n = 0;
+        for (var j = 0; j < (MAX_VERTICES - 1) * 2; j++) {
+          idx[j] = j - n;
+          k++;
+          if (k > 1) {
+            k = 0;
+            n++;
+          }
+        }
+
+        /* create a tile buffer object for the current tile */
+        var tileBuffer = L.tileBuffer(vtx, idx, clr, {
+          x: tile.x,
+          y: tile.y,
+          zoom: zoom
+        });
+
+        /* make sanity check on the tile buffer cache */
+        if (TILE_CACHE.getZoom() != zoom) {
+          TILE_CACHE.resetOnZoom(zoom);
+        }
+
+        /* add tile buffer geometries to the collection */
+        TILE_CACHE.addTile(tileBuffer);
+      }
+    </script>
+  </body>
+</html>
