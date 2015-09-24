@@ -9,7 +9,7 @@ This plugin is optimized for rendering geodata vertices or native geometries on 
 
 **Usage**:
 
-You need a leaflet map and a custom drawing fallback.
+You need a leaflet map and a custom drawing callback.
 
 ```
 var map = L.map("map");
