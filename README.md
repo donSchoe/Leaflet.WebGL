@@ -2,10 +2,9 @@
 
 Leaflet plugin architecture for WebGL integration.
 
+This is the **demo** branch. Please refer to master branch for more detailed documentation.
 
-##### Usage & Demo
-
-*work in progress ...*
+- https://github.com/donSchoe/Leaflet.WebGL/tree/master
 
 
 ##### Requires
