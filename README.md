@@ -2,36 +2,28 @@
 
 Leaflet plugin architecture for WebGL integration.
 
+This plugin is optimized for rendering geodata vertices or native geometries on leaflet maps using WebGL. It's not designed to draw raster tiles or images (yet). That said, it should not be impossible though.
+
 
 ##### Usage & Demo
 
-**Demo**: Random lines on tile buffers rendered with Leaflet.WebGL.
-
-- http://donschoe.github.io/Leaflet.WebGL/
-- https://github.com/donSchoe/Leaflet.WebGL/tree/gh-pages
-
-```
-$ git clone https://github.com/donSchoe/Leaflet.WebGL.git
-$ git checkout -b gh-pages
-```
-
 **Usage**:
 
-1. You need a leaflet map and a custom drawing fallback.
+You need a leaflet map and a custom drawing fallback.
 
 ```
 var map = L.map("map");
 L.WebGL = L.webGL(drawGL).addTo(map);
 ```
 
-2. Get canvas and context from `L.WebGL` (not from Leaflet!).
+Get canvas and context from `L.WebGL` (not from Leaflet!).
 
 ```
 var canvas = L.WebGL.canvas();
 var gl = L.WebGL.context();
 ```
 
-3. Load and compile the shaders. Here: shaders are taken from document header.
+Load and compile the shaders. Here: shaders are taken from document header.
 
 ```
 vtxShader = document.getElementById("shader-vtx").firstChild.textContent;
@@ -39,7 +31,7 @@ frgShader = document.getElementById("shader-frg").firstChild.textContent;
 var program = L.WebGL.initShaders(vtxShader, frgShader);
 ```
 
-4. Tell leaflet-webgl about modelview and vertex attribute locations.
+Tell leaflet-webgl about modelview and vertex attribute locations.
 
 ```
 L.WebGL.setModelViewLocation("u_matrix");
@@ -49,7 +41,7 @@ gl.enableVertexAttribArray(program.vertexPosition);
 gl.enableVertexAttribArray(program.vertexColor);
 ```
 
-5. That's it, now you can draw on your webgl overlay.
+That's it, now you can draw on your webgl overlay.
 
 ```
 function drawGL() {
@@ -58,6 +50,19 @@ function drawGL() {
     /* draw funky gl stuff here */
   }
 }
+```
+
+See demo source code for more details.
+
+
+**Demo**: Random lines on tile buffers rendered with Leaflet.WebGL.
+
+- http://donschoe.github.io/Leaflet.WebGL/
+- https://github.com/donSchoe/Leaflet.WebGL/tree/gh-pages
+
+```
+$ git clone https://github.com/donSchoe/Leaflet.WebGL.git
+$ git checkout -b gh-pages
 ```
 
 
