@@ -1,0 +1,9 @@
+[submodule "lib/leaflet-canvasoverlay"]
+	path = lib/leaflet-canvasoverlay
+	url = https://github.com/donSchoe/L.CanvasOverlay
+[submodule "lib/leaflet-tilebuffer"]
+	path = lib/leaflet-tilebuffer
+	url = https://github.com/donSchoe/L.TileBuffer
+[submodule "lib/leaflet-webgl"]
+	path = lib/leaflet-webgl
+	url = https://github.com/donSchoe/Leaflet.WebGL
